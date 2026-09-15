@@ -163,6 +163,7 @@
               <option value="sad">Emotional · vi–IV–I–V</option>
               <option value="blues">Blues turnaround · I7–IV7–I7–V7</option>
               <option value="rock">Rock · I5–♭VII5–IV5–I5</option>
+              <option value="custom">Custom chords</option>
             </select>
           </label>
           <label class="tempo-field progression-tempo">Tempo <input type="range" min="50" max="180" value="90" id="progressionTempo"><b id="progressionTempoValue">90</b></label>
@@ -175,6 +176,14 @@
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8 5 11 7-11 7V5Z"/></svg>
             Play progression
           </button>
+        </div>
+        <div class="custom-progression-entry" id="customProgressionEntry">
+          <label class="field">
+            <span>Your chords</span>
+            <input type="text" id="customProgressionInput" value="C, G, Am, F" placeholder="C, G, Am, F" autocomplete="off">
+          </label>
+          <button class="secondary-button" id="applyCustomProgression">Use these chords</button>
+          <span>Enter 2–8 chord symbols separated by commas or spaces, such as C, G, Am, F.</span>
         </div>
         <div class="progression-chords" id="progressionChords" aria-label="Chords in progression"></div>
       </div>
