@@ -33,7 +33,7 @@ const INSTRUMENTS = {
     }
   },
   electric:{
-    label:"Electric guitar", courses:6, doubled:false, profile:"electric",
+    label:"Electric guitar · High gain", courses:6, doubled:false, profile:"electric",
     tunings:{
       "Standard · E A D G B E":[40,45,50,55,59,64],
       "Drop D · D A D G B E":[38,45,50,55,59,64],
@@ -125,6 +125,7 @@ const SOUND_SOURCES = {
   baritone:{bank:"MusyngKite",program:"acoustic_guitar_nylon"},
   mandolin:{bank:"MusyngKite",program:"banjo"}
 };
+const ELECTRIC_ATTACK_SOURCE={bank:"MusyngKite",program:"electric_guitar_muted"};
 const SOUND_FONT_HOST="https://gleitz.github.io/midi-js-soundfonts/";
 window.MIDI=window.MIDI||{Soundfont:{}};
 const soundfontPromises=new Map();
@@ -359,11 +360,13 @@ function loadSoundfont(source){
 
 function primeInstrument(){
   const profile=INSTRUMENTS[state.instrument].profile;
-  loadSoundfont(SOUND_SOURCES[profile]||SOUND_SOURCES.acoustic).catch(()=>{});
+  const sources=[SOUND_SOURCES[profile]||SOUND_SOURCES.acoustic];
+  if(profile==="electric")sources.push(ELECTRIC_ATTACK_SOURCE);
+  Promise.all(sources.map(source=>loadSoundfont(source))).catch(()=>{});
 }
 
-async function getSampleBuffer(midi){
-  const profile=INSTRUMENTS[state.instrument].profile,source=SOUND_SOURCES[profile]||SOUND_SOURCES.acoustic;
+async function getSampleBuffer(midi,sourceOverride=null){
+  const profile=INSTRUMENTS[state.instrument].profile,source=sourceOverride||SOUND_SOURCES[profile]||SOUND_SOURCES.acoustic;
   const key=`${source.bank}:${source.program}:${midi}`;if(sampleBuffers.has(key))return sampleBuffers.get(key);
   const bank=await loadSoundfont(source),uri=bank[midiSampleName(midi)];
   if(!uri)throw new Error("Note sample unavailable");
@@ -386,9 +389,14 @@ function connectInstrumentTone(source,gain,profile,pan=0){
     const f=ctx.createBiquadFilter();f.type=type;f.frequency.value=frequency;f.Q.value=q;f.gain.value=boost;node.connect(f);node=f;
   };
   if(profile==="electric"){
-    const pre=ctx.createGain(),drive=ctx.createWaveShaper();pre.gain.value=2.15;drive.curve=getDriveCurve();drive.oversample="4x";
-    node.connect(pre).connect(drive);node=drive;
-    filter("highpass",68,.8);filter("lowshelf",125,.7,7);filter("peaking",430,1.05,-6);filter("peaking",1450,1.1,3);filter("peaking",3200,1,5);filter("lowpass",5200,.85);
+    // A two-stage high-gain amp: tight low end into hard saturation, then a
+    // mid-scooped speaker cabinet. This is deliberately separate from every
+    // acoustic instrument path.
+    const input=ctx.createGain(),drive1=ctx.createWaveShaper(),interstage=ctx.createGain(),drive2=ctx.createWaveShaper();
+    input.gain.value=6.4;drive1.curve=getDriveCurve();drive1.oversample="4x";
+    interstage.gain.value=1.85;drive2.curve=getDriveCurve();drive2.oversample="4x";
+    node.connect(input).connect(drive1).connect(interstage).connect(drive2);node=drive2;
+    filter("highpass",72,.9);filter("lowshelf",118,.75,8.5);filter("peaking",610,1.05,-10);filter("peaking",1650,1.25,2.5);filter("peaking",3150,1.05,7);filter("lowpass",5600,.9);
   }else if(profile==="bass"){
     filter("highpass",34,.8);filter("lowshelf",125,.7,9);filter("peaking",720,1,-2);filter("lowpass",2800,.75);
   }else if(profile==="nylon"){
@@ -410,10 +418,11 @@ function connectInstrumentTone(source,gain,profile,pan=0){
   }else gain.connect(state.audioBus);
 }
 
-function playRecordedBuffer(buffer,stringIndex,when=0,detune=0,gainValue=.62,pan=0){
+function playRecordedBuffer(buffer,stringIndex,when=0,detune=0,gainValue=.62,pan=0,maxDecay=null){
   const ctx=getAudio(),start=ctx.currentTime+when,src=ctx.createBufferSource(),gain=ctx.createGain();
   const profile=INSTRUMENTS[state.instrument].profile;
-  const decay={electric:3.4,bass:3.2,nylon:2.35,twelve:2.8,uke:1.25,baritone:2.1,mandolin:1.15,acoustic:2.7}[profile]||2.5;
+  const naturalDecay={electric:3.4,bass:3.2,nylon:2.35,twelve:2.8,uke:1.25,baritone:2.1,mandolin:1.15,acoustic:2.7}[profile]||2.5;
+  const decay=maxDecay===null?naturalDecay:Math.min(naturalDecay,maxDecay);
   src.buffer=buffer;src.detune.value=detune;
   gain.gain.setValueAtTime(.0001,start);gain.gain.exponentialRampToValueAtTime(gainValue,start+.008);gain.gain.exponentialRampToValueAtTime(.0001,start+Math.min(buffer.duration,decay));
   connectInstrumentTone(src,gain,profile,pan);
@@ -429,9 +438,14 @@ async function pluckMidi(midi,stringIndex=0,when=0) {
     const profile=INSTRUMENTS[state.instrument].profile;
     const primaryGain={electric:.24,bass:.78,nylon:.64,twelve:.47,uke:.57,baritone:.66,mandolin:.46,acoustic:.62}[profile]||.58;
     if(profile==="electric"){
-      playRecordedBuffer(buffer,stringIndex,when,-7,.24,-.62);
-      playRecordedBuffer(buffer,stringIndex,when+.014,6,.24,.62);
-      playRecordedBuffer(buffer,stringIndex,when+.006,0,.14,0);
+      let attack=null;
+      try{attack=await getSampleBuffer(midi,ELECTRIC_ATTACK_SOURCE);}catch(_){}
+      // Wide, slightly mismatched takes create the weight of a double-tracked
+      // metal rhythm guitar. A short palm-muted sample adds a percussive pick.
+      playRecordedBuffer(buffer,stringIndex,when,-9,.21,-.72);
+      playRecordedBuffer(buffer,stringIndex,when+.018,8,.21,.72);
+      playRecordedBuffer(buffer,stringIndex,when+.006,0,.105,0);
+      if(attack)playRecordedBuffer(attack,stringIndex,when,0,.28,0,.22);
       return;
     }
     playRecordedBuffer(buffer,stringIndex,when,0,primaryGain,INSTRUMENTS[state.instrument].doubled?-.16:0);
