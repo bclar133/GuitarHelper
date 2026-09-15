@@ -115,19 +115,20 @@ const OPEN_FINGERS = {
   "B-minor":[null,1,3,4,2,1]
 };
 
-const SOUND_PROGRAMS = {
-  acoustic:"acoustic_guitar_steel",
-  electric:"distortion_guitar",
-  nylon:"acoustic_guitar_nylon",
-  twelve:"acoustic_guitar_steel",
-  bass:"electric_bass_finger",
-  uke:"acoustic_guitar_nylon",
-  baritone:"acoustic_guitar_nylon",
-  mandolin:"acoustic_guitar_steel"
+const SOUND_SOURCES = {
+  acoustic:{bank:"FluidR3_GM",program:"acoustic_guitar_steel"},
+  electric:{bank:"MusyngKite",program:"distortion_guitar"},
+  nylon:{bank:"MusyngKite",program:"acoustic_guitar_nylon"},
+  twelve:{bank:"MusyngKite",program:"acoustic_guitar_steel"},
+  bass:{bank:"MusyngKite",program:"electric_bass_finger"},
+  uke:{bank:"MusyngKite",program:"acoustic_guitar_nylon"},
+  baritone:{bank:"MusyngKite",program:"acoustic_guitar_nylon"},
+  mandolin:{bank:"MusyngKite",program:"banjo"}
 };
-const SOUND_FONT_ROOT="https://gleitz.github.io/midi-js-soundfonts/FluidR3_GM/";
+const SOUND_FONT_HOST="https://gleitz.github.io/midi-js-soundfonts/";
 window.MIDI=window.MIDI||{Soundfont:{}};
 const soundfontPromises=new Map();
+const loadedSoundBanks=new Map();
 const sampleBuffers=new Map();
 
 const state = {
@@ -340,26 +341,31 @@ function midiSampleName(midi){
   return names[((midi%12)+12)%12]+(Math.floor(midi/12)-1);
 }
 
-function loadSoundfont(program){
-  if(window.MIDI.Soundfont[program])return Promise.resolve(window.MIDI.Soundfont[program]);
-  if(soundfontPromises.has(program))return soundfontPromises.get(program);
+function loadSoundfont(source){
+  const key=`${source.bank}:${source.program}`;
+  if(loadedSoundBanks.has(key))return Promise.resolve(loadedSoundBanks.get(key));
+  if(soundfontPromises.has(key))return soundfontPromises.get(key);
   const promise=new Promise((resolve,reject)=>{
-    const script=document.createElement("script");script.src=`${SOUND_FONT_ROOT}${program}-mp3.js`;script.async=true;
-    script.onload=()=>window.MIDI.Soundfont[program]?resolve(window.MIDI.Soundfont[program]):reject(new Error("Sound library unavailable"));
+    const script=document.createElement("script");script.src=`${SOUND_FONT_HOST}${source.bank}/${source.program}-mp3.js`;script.async=true;
+    script.onload=()=>{
+      const bank=window.MIDI.Soundfont[source.program];
+      if(!bank){reject(new Error("Sound library unavailable"));return;}
+      loadedSoundBanks.set(key,bank);resolve(bank);
+    };
     script.onerror=()=>reject(new Error("Sound library unavailable"));document.head.append(script);
   });
-  soundfontPromises.set(program,promise);return promise;
+  soundfontPromises.set(key,promise);return promise;
 }
 
 function primeInstrument(){
   const profile=INSTRUMENTS[state.instrument].profile;
-  loadSoundfont(SOUND_PROGRAMS[profile]||SOUND_PROGRAMS.acoustic).catch(()=>{});
+  loadSoundfont(SOUND_SOURCES[profile]||SOUND_SOURCES.acoustic).catch(()=>{});
 }
 
 async function getSampleBuffer(midi){
-  const profile=INSTRUMENTS[state.instrument].profile,program=SOUND_PROGRAMS[profile]||SOUND_PROGRAMS.acoustic;
-  const key=`${program}:${midi}`;if(sampleBuffers.has(key))return sampleBuffers.get(key);
-  const bank=await loadSoundfont(program),uri=bank[midiSampleName(midi)];
+  const profile=INSTRUMENTS[state.instrument].profile,source=SOUND_SOURCES[profile]||SOUND_SOURCES.acoustic;
+  const key=`${source.bank}:${source.program}:${midi}`;if(sampleBuffers.has(key))return sampleBuffers.get(key);
+  const bank=await loadSoundfont(source),uri=bank[midiSampleName(midi)];
   if(!uri)throw new Error("Note sample unavailable");
   const bytes=await fetch(uri).then(r=>r.arrayBuffer()),buffer=await getAudio().decodeAudioData(bytes);
   sampleBuffers.set(key,buffer);return buffer;
@@ -380,9 +386,9 @@ function connectInstrumentTone(source,gain,profile,pan=0){
     const f=ctx.createBiquadFilter();f.type=type;f.frequency.value=frequency;f.Q.value=q;f.gain.value=boost;node.connect(f);node=f;
   };
   if(profile==="electric"){
-    const pre=ctx.createGain(),drive=ctx.createWaveShaper();pre.gain.value=3.7;drive.curve=getDriveCurve();drive.oversample="4x";
+    const pre=ctx.createGain(),drive=ctx.createWaveShaper();pre.gain.value=2.15;drive.curve=getDriveCurve();drive.oversample="4x";
     node.connect(pre).connect(drive);node=drive;
-    filter("highpass",85,.7);filter("peaking",1250,1.1,5);filter("lowpass",4300,.8);
+    filter("highpass",68,.8);filter("lowshelf",125,.7,7);filter("peaking",430,1.05,-6);filter("peaking",1450,1.1,3);filter("peaking",3200,1,5);filter("lowpass",5200,.85);
   }else if(profile==="bass"){
     filter("highpass",34,.8);filter("lowshelf",125,.7,9);filter("peaking",720,1,-2);filter("lowpass",2800,.75);
   }else if(profile==="nylon"){
@@ -421,7 +427,13 @@ async function pluckMidi(midi,stringIndex=0,when=0) {
   try{
     const buffer=await getSampleBuffer(midi);
     const profile=INSTRUMENTS[state.instrument].profile;
-    const primaryGain={electric:.38,bass:.78,nylon:.64,twelve:.47,uke:.57,baritone:.66,mandolin:.46,acoustic:.62}[profile]||.58;
+    const primaryGain={electric:.24,bass:.78,nylon:.64,twelve:.47,uke:.57,baritone:.66,mandolin:.46,acoustic:.62}[profile]||.58;
+    if(profile==="electric"){
+      playRecordedBuffer(buffer,stringIndex,when,-7,.24,-.62);
+      playRecordedBuffer(buffer,stringIndex,when+.014,6,.24,.62);
+      playRecordedBuffer(buffer,stringIndex,when+.006,0,.14,0);
+      return;
+    }
     playRecordedBuffer(buffer,stringIndex,when,0,primaryGain,INSTRUMENTS[state.instrument].doubled?-.16:0);
     if(INSTRUMENTS[state.instrument].doubled){
       const octave=state.instrument==="twelve"&&stringIndex<4?12:0;
