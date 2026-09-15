@@ -55,24 +55,10 @@ button { color: inherit; }
 .brand p { margin: 5px 0 0; color: var(--muted); font-size: .78rem; letter-spacing: .08em; text-transform: uppercase; }
 
 .logo-mark {
-  position: relative;
-  width: 42px; height: 42px;
-  border: 1px solid #4b4439;
-  border-radius: 12px;
-  background: linear-gradient(145deg, #2a2722, #171614);
-  transform: rotate(-3deg);
-  overflow: hidden;
+  width: 48px; height: 48px; flex:0 0 48px; display:block; object-fit:contain;
+  border-radius: 13px; background:#11110f;
+  box-shadow:0 5px 16px rgba(0,0,0,.3),0 0 0 1px rgba(245,231,200,.14);
 }
-.logo-mark::before {
-  content: "";
-  position: absolute; left: 8px; right: 8px; top: 9px; height: 3px;
-  background: var(--amber); box-shadow: 0 7px var(--amber), 0 14px var(--amber), 0 21px var(--amber);
-  border-radius: 4px;
-}
-.logo-mark span { position: absolute; top: 5px; bottom: 5px; width: 1px; background: #e9dfcf; opacity: .7; }
-.logo-mark span:nth-child(1) { left: 15px; }
-.logo-mark span:nth-child(2) { left: 23px; }
-.logo-mark span:nth-child(3) { left: 31px; }
 
 .header-actions { display: flex; gap: 8px; }
 .icon-button {
@@ -328,7 +314,7 @@ dialog strong { color:var(--ink); }
   .app-shell { padding:12px 10px 8px; }
   .topbar { padding-bottom:10px; }
   .brand p { display:none; }
-  .logo-mark { width:36px; height:36px; }
+  .logo-mark { width:40px; height:40px; flex-basis:40px; border-radius:11px; }
   .control-rack { grid-template-columns:1fr 1fr; gap:9px; padding:9px; }
   .capo-field { order:3; }
   .switch-field { order:4; justify-content:flex-end; padding-right:3px; }
