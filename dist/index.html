@@ -68,6 +68,10 @@
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4v16M10 4v16M15 4v16M20 4v16M3 8h19M3 14h19"/></svg>
             Chords
           </button>
+          <button class="mode-tab" data-panel="progressions" role="tab" aria-selected="false">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h11m0 0-3-3m3 3-3 3M19 17H8m0 0 3-3m-3 3 3 3"/></svg>
+            Progressions
+          </button>
           <button class="mode-tab" data-panel="tabs" role="tab" aria-selected="false">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16M8 3v18m8-18v18"/></svg>
             Tabs
@@ -140,6 +144,41 @@
         </div>
       </div>
 
+      <div class="progression-panel panel" id="progressionsPanel">
+        <div class="progression-controls">
+          <label class="field compact">
+            <span>Key</span>
+            <select id="progressionKey">
+              <option>C</option><option>C♯</option><option>D</option><option>E♭</option>
+              <option>E</option><option>F</option><option>F♯</option><option>G</option>
+              <option>A♭</option><option>A</option><option>B♭</option><option>B</option>
+            </select>
+          </label>
+          <label class="field progression-style-field">
+            <span>Progression</span>
+            <select id="progressionStyle">
+              <option value="pop">Pop · I–V–vi–IV</option>
+              <option value="classic">Classic · I–IV–V–I</option>
+              <option value="fifties">50s · I–vi–IV–V</option>
+              <option value="sad">Emotional · vi–IV–I–V</option>
+              <option value="blues">Blues turnaround · I7–IV7–I7–V7</option>
+              <option value="rock">Rock · I5–♭VII5–IV5–I5</option>
+            </select>
+          </label>
+          <label class="tempo-field progression-tempo">Tempo <input type="range" min="50" max="180" value="90" id="progressionTempo"><b id="progressionTempoValue">90</b></label>
+          <label class="field beats-field">
+            <span>Beats per chord</span>
+            <select id="progressionBeats"><option value="1">1</option><option value="2" selected>2</option><option value="4">4</option></select>
+          </label>
+          <label class="loop-field"><input type="checkbox" id="progressionLoop"> Loop</label>
+          <button class="primary-button" id="playProgression">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8 5 11 7-11 7V5Z"/></svg>
+            Play progression
+          </button>
+        </div>
+        <div class="progression-chords" id="progressionChords" aria-label="Chords in progression"></div>
+      </div>
+
       <div class="tab-panel panel" id="tabsPanel">
         <div class="tab-tools">
           <div>
@@ -148,6 +187,7 @@
           </div>
           <label class="tempo-field">Tempo <input type="range" min="50" max="180" value="90" id="tempoSlider"><b id="tempoValue">90</b></label>
           <button class="secondary-button" id="loadDemo">Load demo</button>
+          <button class="secondary-button" id="loadProgressionTab">Load progression</button>
           <button class="primary-button" id="playTab">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8 5 11 7-11 7V5Z"/></svg>
             Play tab
@@ -219,6 +259,7 @@
       <li><strong>Choose a chord.</strong> Coloured markers show exactly what to play. × means mute; ○ means play open.</li>
       <li><strong>Hear it.</strong> Press “Strum chord”, click a string, or sweep your pointer across the strings.</li>
       <li><strong>Follow tabs.</strong> Paste ordinary tab and the fretboard will light up as it plays.</li>
+      <li><strong>Play progressions.</strong> Choose a key and pattern, then follow each highlighted chord or load it as tab.</li>
       <li><strong>Tune up.</strong> Allow microphone access and play one clear string at a time.</li>
     </ol>
   </dialog>
