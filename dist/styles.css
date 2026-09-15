@@ -57,7 +57,7 @@ button { color: inherit; }
 .logo-mark {
   width: 48px; height: 48px; flex:0 0 48px; display:block; object-fit:contain;
   border-radius: 13px; background:#11110f;
-  box-shadow:0 5px 16px rgba(0,0,0,.3),0 0 0 1px rgba(245,231,200,.14);
+  box-shadow:0 5px 16px rgba(0,0,0,.3);
 }
 
 .header-actions { display: flex; gap: 8px; }
