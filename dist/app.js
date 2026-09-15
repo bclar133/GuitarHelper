@@ -199,11 +199,16 @@ function renderFretboard() {
   const strings=document.createElement("div"); strings.className="string-layer";
   const notes=document.createElement("div"); notes.className="note-layer";
   const markers=document.createElement("div"); markers.className="open-markers";
+  const lowestPitch=Math.min(...state.tuning),highestPitch=Math.max(...state.tuning);
+  const pitchRange=Math.max(1,highestPitch-lowestPitch);
+  const thinGauge=instrument.profile==="bass"?1.35:.85;
+  const gaugeRange=instrument.profile==="bass"?2.15:1.95;
   for (let display=0; display<count; display++) {
     const stringIndex=count-1-display;
     const row=document.createElement("div"); row.className="string-row"+(instrument.doubled?" doubled":""); row.dataset.string=stringIndex;
     const line=document.createElement("div"); line.className="string-line";
-    line.style.setProperty("--gauge", (1+((count-1-display)/(Math.max(count-1,1)))*2.6)+"px");
+    const relativeThickness=(highestPitch-state.tuning[stringIndex])/pitchRange;
+    line.style.setProperty("--gauge",(thinGauge+relativeThickness*gaugeRange).toFixed(2)+"px");
     row.append(line); strings.append(row);
     const noteRow=document.createElement("div"); noteRow.className="note-row"; noteRow.dataset.string=stringIndex;
     for(let fret=1;fret<=20;fret++){const n=document.createElement("span");n.className="note";n.dataset.fret=fret;n.style.gridColumn=String(fret);noteRow.append(n);}
