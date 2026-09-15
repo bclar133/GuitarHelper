@@ -156,6 +156,25 @@ input[type="range"] { accent-color: var(--amber); width: 100%; }
 .current-chord strong { font-size: .95rem; }
 .current-chord span { color: var(--muted); font-size: .8rem; }
 
+.progression-panel { display:none; flex-direction:column; gap:11px; }
+.progression-panel.active { display:flex; }
+.progression-controls { display:flex; align-items:end; gap:10px; flex-wrap:wrap; }
+.progression-style-field { min-width:230px; }
+.progression-tempo { min-height:42px; }
+.beats-field { min-width:112px; }
+.loop-field { min-height:42px; display:flex; align-items:center; gap:7px; color:var(--muted); font-size:.82rem; white-space:nowrap; }
+.loop-field input { accent-color:var(--amber); }
+.progression-chords { display:grid; grid-template-columns:repeat(4,minmax(90px,1fr)); gap:8px; }
+.progression-chord {
+  min-height:54px; display:flex; align-items:center; justify-content:center; gap:10px;
+  border:1px solid #45413b; border-radius:11px; color:var(--ink); background:#24221e;
+}
+.progression-chord:hover { border-color:#766a57; background:#2d2a25; }
+.progression-chord.active { color:#1b160e; border-color:var(--amber-light); background:var(--amber); box-shadow:0 5px 18px rgba(229,168,61,.18); }
+.progression-chord .degree { color:var(--muted); font-size:.67rem; font-weight:700; text-transform:uppercase; letter-spacing:.08em; }
+.progression-chord.active .degree { color:#5c451f; }
+.progression-chord strong { font:1.45rem/1 "Instrument Serif",serif; }
+
 .tab-panel { display: none; flex-direction: column; gap: 10px; }
 .tab-panel.active { display: flex; }
 .tab-tools { display: flex; align-items: center; gap: 10px; }
@@ -297,6 +316,7 @@ dialog strong { color:var(--ink); }
   .capo-field { order:3; }
   .switch-field { order:4; justify-content:flex-end; padding-right:3px; }
   .mode-heading { margin-top:9px; }
+  .mode-tabs { overflow-x:auto; }
   .mode-tab { padding:11px 10px; font-size:.84rem; }
   .mode-tab svg { display:none; }
   .legend { gap:7px; }
@@ -312,6 +332,17 @@ dialog strong { color:var(--ink); }
   .variation { flex:1; padding-inline:5px; }
   .current-chord { grid-column:1/-1; min-width:0; justify-content:flex-start; padding:4px 2px 0; }
   .chord-symbol { font-size:3rem; }
+  .progression-controls { display:grid; grid-template-columns:.7fr 1.3fr; align-items:end; gap:8px; }
+  .progression-style-field { min-width:0; }
+  .progression-tempo { grid-column:1/-1; }
+  .progression-tempo input { flex:1; }
+  .beats-field { min-width:0; }
+  .loop-field { justify-content:center; }
+  .progression-controls .primary-button { grid-column:1/-1; }
+  .progression-chords { gap:5px; }
+  .progression-chord { min-width:0; min-height:46px; gap:5px; padding:5px; }
+  .progression-chord strong { font-size:1.2rem; }
+  .progression-chord .degree { font-size:.56rem; }
   .tab-tools { flex-wrap:wrap; }
   .tab-tools > div:first-child { width:100%; }
   .tempo-field { margin-right:auto; }
