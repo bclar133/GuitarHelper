@@ -166,6 +166,18 @@ input[type="range"] { accent-color: var(--amber); width: 100%; }
 .custom-progression-entry { display:grid; grid-template-columns:minmax(220px,1fr) auto; align-items:end; gap:8px; padding:10px; border:1px solid #3d3933; border-radius:12px; background:#1d1c19; }
 .custom-progression-entry input { width:100%; border:1px solid #45413b; border-radius:10px; color:var(--ink); background:#25231f; padding:10px 11px; outline:none; }
 .custom-progression-entry > span { grid-column:1/-1; color:var(--muted); font-size:.73rem; }
+.progression-typeahead { position:relative; min-width:0; }
+.progression-typeahead .field { display:grid; }
+.progression-suggestions {
+  position:absolute; z-index:40; top:calc(100% + 5px); left:0; right:0; max-height:236px; overflow-y:auto;
+  padding:5px; border:1px solid #555047; border-radius:11px; background:#24221e; box-shadow:0 16px 38px rgba(0,0,0,.48);
+}
+.progression-suggestions[hidden] { display:none; }
+.progression-suggestion { width:100%; min-height:38px; display:flex; align-items:center; gap:10px; padding:7px 9px; border:0; border-radius:7px; color:var(--ink); background:transparent; text-align:left; }
+.progression-suggestion:hover,.progression-suggestion.active { color:#1b160e; background:var(--amber); }
+.progression-suggestion strong { min-width:62px; font:1.2rem/1 "Instrument Serif",serif; }
+.progression-suggestion span { color:var(--muted); font-size:.76rem; }
+.progression-suggestion:hover span,.progression-suggestion.active span { color:#5c451f; }
 .progression-library-add { grid-column:1/-1; display:grid; grid-template-columns:minmax(220px,1fr) auto auto; align-items:end; gap:8px; }
 .text-button { min-height:42px; padding:8px 10px; border:0; color:var(--muted); background:transparent; font-weight:600; }
 .text-button:hover { color:var(--ink); }
