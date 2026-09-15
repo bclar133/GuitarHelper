@@ -141,6 +141,8 @@ const state = {
   tunerStream:null, tunerFrame:null, tabActive:null
 };
 const chordSearchMap = new Map();
+let progressionChordChoices=[];
+let progressionSuggestionIndex=-1;
 
 const $ = id => document.getElementById(id);
 const els = {
@@ -152,6 +154,7 @@ const els = {
   tempo:$("tempoSlider"), tempoValue:$("tempoValue"), tunerNote:$("tunerNote"), tunerFrequency:$("tunerFrequency"),
   progressionTempo:$("progressionTempo"), progressionTempoValue:$("progressionTempoValue"), progressionBeats:$("progressionBeats"),
   progressionChords:$("progressionChords"), progressionChordPicker:$("progressionChordPicker"), customProgressionInput:$("customProgressionInput"),
+  progressionSuggestions:$("progressionSuggestions"),
   tunerTarget:$("tunerTarget"), tunerNeedle:$("tunerNeedle"), meterLabel:$("meterLabel"), tuningStrings:$("tuningStrings"),
   referencePitch:$("referencePitch"), startTuner:$("startTuner")
 };
@@ -183,9 +186,11 @@ function populateChordLibrary(){
 function populateProgressionChordPicker(){
   const typeLabels=Object.fromEntries([...$("chordTypeSelect").options].map(option=>[option.value,option.textContent]));
   els.progressionChordPicker.innerHTML="";
+  progressionChordChoices=[];
   NOTE_NAMES.forEach(root=>Object.keys(CHORDS).forEach(type=>{
     const option=document.createElement("option");
     option.value=root+CHORDS[type].suffix;option.textContent=`${option.value} — ${root} ${typeLabels[type]}`;
+    progressionChordChoices.push({symbol:option.value,root,suffix:CHORDS[type].suffix.toLowerCase(),label:`${root} ${typeLabels[type]}`});
     els.progressionChordPicker.append(option);
   }));
 }
@@ -548,6 +553,61 @@ function progressionTokens(text){
   return(text.includes(",")?text.split(","):text.split(/\s+/)).map(value=>value.trim()).filter(Boolean);
 }
 
+function activeProgressionToken(){
+  const input=els.customProgressionInput,value=input.value;
+  const caret=input.selectionStart??value.length;
+  const comma=value.lastIndexOf(",",Math.max(0,caret-1));
+  const segmentStart=comma+1;
+  const leading=(value.slice(segmentStart,caret).match(/^\s*/)||[""])[0].length;
+  const start=segmentStart+leading;
+  const nextComma=value.indexOf(",",caret);
+  const end=nextComma<0?value.length:nextComma;
+  return{start,end,query:value.slice(start,caret).trim()};
+}
+
+function progressionMatches(query){
+  const token=query.replaceAll("♯","#").replaceAll("♭","b");
+  const match=token.match(/^([A-Ga-g])([#b]?)(.*)$/);
+  if(!match)return[];
+  const rawRoot=match[1].toUpperCase()+match[2];
+  const aliases={"C#":"C♯",Db:"C♯","D#":"E♭",Eb:"E♭","E#":"F",Fb:"E","F#":"F♯",Gb:"F♯","G#":"A♭",Ab:"A♭","A#":"B♭",Bb:"B♭","B#":"C",Cb:"B"};
+  const root=aliases[rawRoot]||rawRoot;
+  const suffix=match[3].toLowerCase();
+  return progressionChordChoices.filter(choice=>choice.root===root&&choice.suffix.startsWith(suffix));
+}
+
+function hideProgressionSuggestions(){
+  progressionSuggestionIndex=-1;
+  els.progressionSuggestions.hidden=true;
+  els.customProgressionInput.setAttribute("aria-expanded","false");
+  els.customProgressionInput.removeAttribute("aria-activedescendant");
+}
+
+function paintProgressionSuggestionSelection(){
+  const options=[...els.progressionSuggestions.querySelectorAll(".progression-suggestion")];
+  options.forEach((option,index)=>option.classList.toggle("active",index===progressionSuggestionIndex));
+  const active=options[progressionSuggestionIndex];
+  if(active){els.customProgressionInput.setAttribute("aria-activedescendant",active.id);active.scrollIntoView({block:"nearest"});}
+  else els.customProgressionInput.removeAttribute("aria-activedescendant");
+}
+
+function showProgressionSuggestions(){
+  const {query}=activeProgressionToken();
+  const matches=query?progressionMatches(query):[];
+  if(!matches.length){hideProgressionSuggestions();return;}
+  progressionSuggestionIndex=-1;
+  els.progressionSuggestions.innerHTML=matches.map((choice,index)=>`<button type="button" class="progression-suggestion" id="progression-suggestion-${index}" role="option" data-symbol="${choice.symbol}"><strong>${choice.symbol}</strong><span>${choice.label}</span></button>`).join("");
+  els.progressionSuggestions.hidden=false;
+  els.customProgressionInput.setAttribute("aria-expanded","true");
+}
+
+function chooseProgressionSuggestion(symbol){
+  const input=els.customProgressionInput,{start,end}=activeProgressionToken();
+  input.value=input.value.slice(0,start)+symbol+input.value.slice(end);
+  const caret=start+symbol.length;
+  input.setSelectionRange(caret,caret);input.focus();hideProgressionSuggestions();
+}
+
 function parseCustomProgression(text){
   const values=progressionTokens(text);
   if(values.length<2||values.length>8)throw new Error("Enter between 2 and 8 chords");
@@ -575,7 +635,7 @@ function addProgressionChord(){
 }
 
 function clearProgressionEntry(){
-  els.customProgressionInput.value="";els.customProgressionInput.focus();showToast("Chord entry cleared");
+  els.customProgressionInput.value="";hideProgressionSuggestions();els.customProgressionInput.focus();showToast("Chord entry cleared");
 }
 
 function getProgression(){
@@ -770,7 +830,25 @@ function bindEvents(){
   $("applyCustomProgression").addEventListener("click",applyCustomProgression);
   $("addProgressionChord").addEventListener("click",addProgressionChord);
   $("clearProgressionChords").addEventListener("click",clearProgressionEntry);
-  els.customProgressionInput.addEventListener("keydown",event=>{if(event.key==="Enter"){event.preventDefault();applyCustomProgression();}});
+  els.customProgressionInput.addEventListener("input",showProgressionSuggestions);
+  els.customProgressionInput.addEventListener("click",showProgressionSuggestions);
+  els.customProgressionInput.addEventListener("keydown",event=>{
+    const options=[...els.progressionSuggestions.querySelectorAll(".progression-suggestion")];
+    if(!els.progressionSuggestions.hidden&&(event.key==="ArrowDown"||event.key==="ArrowUp")){
+      event.preventDefault();
+      const direction=event.key==="ArrowDown"?1:-1;
+      progressionSuggestionIndex=(progressionSuggestionIndex+direction+options.length)%options.length;
+      paintProgressionSuggestionSelection();return;
+    }
+    if(!els.progressionSuggestions.hidden&&(event.key==="Enter"||event.key==="Tab")){
+      const selected=options[progressionSuggestionIndex]||options[0];
+      if(selected){event.preventDefault();chooseProgressionSuggestion(selected.dataset.symbol);return;}
+    }
+    if(event.key==="Escape"){hideProgressionSuggestions();return;}
+    if(event.key==="Enter"){event.preventDefault();applyCustomProgression();}
+  });
+  els.progressionSuggestions.addEventListener("pointerdown",event=>{const option=event.target.closest(".progression-suggestion");if(option){event.preventDefault();chooseProgressionSuggestion(option.dataset.symbol);}});
+  els.customProgressionInput.addEventListener("blur",()=>setTimeout(hideProgressionSuggestions,120));
   els.progressionTempo.addEventListener("input",()=>{els.progressionTempoValue.textContent=els.progressionTempo.value;els.tempo.value=els.progressionTempo.value;els.tempoValue.textContent=els.tempo.value;});
   els.progressionChords.addEventListener("click",e=>{const button=e.target.closest("[data-index]");if(button){stopProgression();showProgressionChord(Number(button.dataset.index));}});
   $("playProgression").addEventListener("click",playProgression);
