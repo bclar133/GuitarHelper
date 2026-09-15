@@ -20,15 +20,6 @@ const CHORDS = {
   "5":{suffix:"5", intervals:[0,7], description:"Strong, direct power chord"}
 };
 
-const PROGRESSIONS = {
-  pop:{degrees:[0,7,9,5],types:["major","major","minor","major"],numerals:["I","V","vi","IV"]},
-  classic:{degrees:[0,5,7,0],types:["major","major","major","major"],numerals:["I","IV","V","I"]},
-  fifties:{degrees:[0,9,5,7],types:["major","minor","major","major"],numerals:["I","vi","IV","V"]},
-  sad:{degrees:[9,5,0,7],types:["minor","major","major","major"],numerals:["vi","IV","I","V"]},
-  blues:{degrees:[0,5,0,7],types:["7","7","7","7"],numerals:["I7","IV7","I7","V7"]},
-  rock:{degrees:[0,10,5,0],types:["5","5","5","5"],numerals:["I5","♭VII5","IV5","I5"]}
-};
-
 const INSTRUMENTS = {
   acoustic:{
     label:"Acoustic guitar", courses:6, doubled:false, profile:"acoustic",
@@ -159,15 +150,15 @@ const els = {
   neckLabel:$("neckLabel"), footerInstrument:$("footerInstrument"), markerLabels:$("markerLabels"),
   audioToggle:$("audioToggle"), toast:$("toast"), tabInput:$("tabInput"), tabStatus:$("tabStatus"),
   tempo:$("tempoSlider"), tempoValue:$("tempoValue"), tunerNote:$("tunerNote"), tunerFrequency:$("tunerFrequency"),
-  progressionKey:$("progressionKey"), progressionStyle:$("progressionStyle"), progressionTempo:$("progressionTempo"),
-  progressionTempoValue:$("progressionTempoValue"), progressionBeats:$("progressionBeats"), progressionChords:$("progressionChords"),
-  customProgressionEntry:$("customProgressionEntry"), customProgressionInput:$("customProgressionInput"),
+  progressionTempo:$("progressionTempo"), progressionTempoValue:$("progressionTempoValue"), progressionBeats:$("progressionBeats"),
+  progressionChords:$("progressionChords"), progressionChordPicker:$("progressionChordPicker"), customProgressionInput:$("customProgressionInput"),
   tunerTarget:$("tunerTarget"), tunerNeedle:$("tunerNeedle"), meterLabel:$("meterLabel"), tuningStrings:$("tuningStrings"),
   referencePitch:$("referencePitch"), startTuner:$("startTuner")
 };
 
 function init() {
   populateChordLibrary();
+  populateProgressionChordPicker();
   renderTunings();
   renderFretboard();
   updateChord();
@@ -186,6 +177,16 @@ function populateChordLibrary(){
     chordSearchMap.set(label.toLowerCase(),{root,type});
     chordSearchMap.set(symbol.toLowerCase(),{root,type});
     const option=document.createElement("option");option.value=label;list.append(option);
+  }));
+}
+
+function populateProgressionChordPicker(){
+  const typeLabels=Object.fromEntries([...$("chordTypeSelect").options].map(option=>[option.value,option.textContent]));
+  els.progressionChordPicker.innerHTML="";
+  NOTE_NAMES.forEach(root=>Object.keys(CHORDS).forEach(type=>{
+    const option=document.createElement("option");
+    option.value=root+CHORDS[type].suffix;option.textContent=`${option.value} — ${root} ${typeLabels[type]}`;
+    els.progressionChordPicker.append(option);
   }));
 }
 
@@ -543,36 +544,42 @@ function parseChordSymbol(value){
   return{root,type,symbol:root+CHORDS[type].suffix};
 }
 
-function parseCustomProgression(text){
-  const values=(text.includes(",")?text.split(","):text.split(/\s+/)).map(value=>value.trim()).filter(Boolean);
-  if(values.length<2||values.length>8)throw new Error("Enter between 2 and 8 chords");
-  return values.map(parseChordSymbol);
+function progressionTokens(text){
+  return(text.includes(",")?text.split(","):text.split(/\s+/)).map(value=>value.trim()).filter(Boolean);
 }
 
-function updateCustomProgressionVisibility(){
-  const custom=els.progressionStyle.value==="custom";
-  els.customProgressionEntry.classList.toggle("visible",custom);
-  els.progressionKey.disabled=custom;
+function parseCustomProgression(text){
+  const values=progressionTokens(text);
+  if(values.length<2||values.length>8)throw new Error("Enter between 2 and 8 chords");
+  return values.map(parseChordSymbol);
 }
 
 function applyCustomProgression(){
   try{
     parseCustomProgression(els.customProgressionInput.value);
     state.customChordText=els.customProgressionInput.value;
-    els.progressionStyle.value="custom";renderProgression(true);
-    showToast("Custom progression ready");
+    renderProgression(true);showToast("Progression ready");
   }catch(error){showToast(error.message);}
 }
 
+function addProgressionChord(){
+  const symbol=els.progressionChordPicker.value;
+  const current=progressionTokens(els.customProgressionInput.value);
+  if(current.length>=8){showToast("A progression can contain up to 8 chords");return;}
+  current.push(symbol);els.customProgressionInput.value=current.join(", ");
+  if(current.length<2){showToast("Choose at least one more chord");return;}
+  try{
+    parseCustomProgression(els.customProgressionInput.value);
+    state.customChordText=els.customProgressionInput.value;renderProgression(true);
+  }catch(error){showToast(error.message);}
+}
+
+function clearProgressionEntry(){
+  els.customProgressionInput.value="";els.customProgressionInput.focus();showToast("Chord entry cleared");
+}
+
 function getProgression(){
-  if(els.progressionStyle.value==="custom"){
-    return parseCustomProgression(state.customChordText).map((chord,index)=>({...chord,numeral:String(index+1),shape:buildShapeFor(chord.root,chord.type)}));
-  }
-  const pattern=PROGRESSIONS[els.progressionStyle.value],keyPc=NOTE_TO_PC[els.progressionKey.value];
-  return pattern.degrees.map((degree,index)=>{
-    const root=NOTE_NAMES[(keyPc+degree)%12],type=pattern.types[index];
-    return{root,type,numeral:pattern.numerals[index],symbol:root+CHORDS[type].suffix,shape:buildShapeFor(root,type)};
-  });
+  return parseCustomProgression(state.customChordText).map((chord,index)=>({...chord,numeral:String(index+1),shape:buildShapeFor(chord.root,chord.type)}));
 }
 
 function progressionToTab(chords){
@@ -597,7 +604,6 @@ function loadProgressionTab(){
 
 function renderProgression(writeTab=false){
   stopProgression();
-  updateCustomProgressionVisibility();
   state.progression=getProgression();
   els.progressionChords.innerHTML=state.progression.map((chord,index)=>`<button class="progression-chord" data-index="${index}" aria-label="Show ${chord.symbol} chord"><span class="degree">${chord.numeral}</span><strong>${chord.symbol}</strong></button>`).join("");
   if(writeTab)loadProgressionTab();
@@ -761,9 +767,9 @@ function bindEvents(){
   els.audioToggle.addEventListener("click",()=>{state.muted=!state.muted;els.audioToggle.classList.toggle("muted",state.muted);showToast(state.muted?"Audio muted":"Audio on");});
   $("helpButton").addEventListener("click",()=>$("helpDialog").showModal());$("closeHelp").addEventListener("click",()=>$("helpDialog").close());
   $("helpDialog").addEventListener("click",e=>{if(e.target===$("helpDialog"))$("helpDialog").close();});
-  els.progressionKey.addEventListener("change",()=>renderProgression(true));
-  els.progressionStyle.addEventListener("change",()=>renderProgression(true));
   $("applyCustomProgression").addEventListener("click",applyCustomProgression);
+  $("addProgressionChord").addEventListener("click",addProgressionChord);
+  $("clearProgressionChords").addEventListener("click",clearProgressionEntry);
   els.customProgressionInput.addEventListener("keydown",event=>{if(event.key==="Enter"){event.preventDefault();applyCustomProgression();}});
   els.progressionTempo.addEventListener("input",()=>{els.progressionTempoValue.textContent=els.progressionTempo.value;els.tempo.value=els.progressionTempo.value;els.tempoValue.textContent=els.tempo.value;});
   els.progressionChords.addEventListener("click",e=>{const button=e.target.closest("[data-index]");if(button){stopProgression();showProgressionChord(Number(button.dataset.index));}});
