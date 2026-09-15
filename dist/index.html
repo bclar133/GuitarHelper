@@ -158,10 +158,13 @@
           </button>
         </div>
         <div class="custom-progression-entry">
-          <label class="field">
-            <span>Type your progression</span>
-            <input type="text" id="customProgressionInput" value="C, G, Am, F" placeholder="C, G, Am, F" autocomplete="off">
-          </label>
+          <div class="progression-typeahead">
+            <label class="field" for="customProgressionInput">
+              <span>Type your progression</span>
+              <input type="text" id="customProgressionInput" value="C, G, Am, F" placeholder="C, G, Am, F" autocomplete="off" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="progressionSuggestions">
+            </label>
+            <div class="progression-suggestions" id="progressionSuggestions" role="listbox" aria-label="Chord suggestions" hidden></div>
+          </div>
           <button class="secondary-button" id="applyCustomProgression">Use these chords</button>
           <div class="progression-library-add">
             <label class="field">
@@ -171,7 +174,7 @@
             <button class="secondary-button" id="addProgressionChord">Add chord</button>
             <button class="text-button" id="clearProgressionChords">Clear</button>
           </div>
-          <span>Enter 2–8 chord symbols separated by commas or spaces, or add them from the chord list.</span>
+          <span>Start typing a chord and choose from the list. Add a comma to begin the next chord (2–8 chords).</span>
         </div>
         <div class="progression-chords" id="progressionChords" aria-label="Chords in progression"></div>
       </div>
