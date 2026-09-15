@@ -20,6 +20,15 @@ const CHORDS = {
   "5":{suffix:"5", intervals:[0,7], description:"Strong, direct power chord"}
 };
 
+const PROGRESSIONS = {
+  pop:{degrees:[0,7,9,5],types:["major","major","minor","major"],numerals:["I","V","vi","IV"]},
+  classic:{degrees:[0,5,7,0],types:["major","major","major","major"],numerals:["I","IV","V","I"]},
+  fifties:{degrees:[0,9,5,7],types:["major","minor","major","major"],numerals:["I","vi","IV","V"]},
+  sad:{degrees:[9,5,0,7],types:["minor","major","major","major"],numerals:["vi","IV","I","V"]},
+  blues:{degrees:[0,5,0,7],types:["7","7","7","7"],numerals:["I7","IV7","I7","V7"]},
+  rock:{degrees:[0,10,5,0],types:["5","5","5","5"],numerals:["I5","♭VII5","IV5","I5"]}
+};
+
 const INSTRUMENTS = {
   acoustic:{
     label:"Acoustic guitar", courses:6, doubled:false, profile:"acoustic",
@@ -136,7 +145,8 @@ const state = {
   instrument:"acoustic", tuningName:"Standard · E A D G B E", tuning:INSTRUMENTS.acoustic.tunings["Standard · E A D G B E"],
   root:"C", chordType:"major", variation:"open", capo:0, lefty:false,
   labelMode:"fingers", muted:false, shape:[], fingers:[], audio:null, audioBus:null,
-  tabTimer:null, tunerStream:null, tunerFrame:null, tabActive:null
+  tabTimer:null, progressionTimer:null, progressionIndex:-1, progression:[], progressionLoadId:0,
+  tunerStream:null, tunerFrame:null, tabActive:null
 };
 const chordSearchMap = new Map();
 
@@ -148,6 +158,8 @@ const els = {
   neckLabel:$("neckLabel"), footerInstrument:$("footerInstrument"), markerLabels:$("markerLabels"),
   audioToggle:$("audioToggle"), toast:$("toast"), tabInput:$("tabInput"), tabStatus:$("tabStatus"),
   tempo:$("tempoSlider"), tempoValue:$("tempoValue"), tunerNote:$("tunerNote"), tunerFrequency:$("tunerFrequency"),
+  progressionKey:$("progressionKey"), progressionStyle:$("progressionStyle"), progressionTempo:$("progressionTempo"),
+  progressionTempoValue:$("progressionTempoValue"), progressionBeats:$("progressionBeats"), progressionChords:$("progressionChords"),
   tunerTarget:$("tunerTarget"), tunerNeedle:$("tunerNeedle"), meterLabel:$("meterLabel"), tuningStrings:$("tuningStrings"),
   referencePitch:$("referencePitch"), startTuner:$("startTuner")
 };
@@ -157,7 +169,7 @@ function init() {
   renderTunings();
   renderFretboard();
   updateChord();
-  loadDemoTab();
+  renderProgression(true);
   bindEvents();
   primeInstrument();
   registerWebMCP();
@@ -229,14 +241,14 @@ function findRootFret(openPc, rootPc, min=0) {
   return fret;
 }
 
-function buildShape() {
+function buildShapeFor(root,type,variation=state.variation) {
   const instrument=INSTRUMENTS[state.instrument];
-  if(instrument.courses!==6 || state.tuning.length!==6 || !state.tuningName.startsWith("Standard")) return chordToneShape();
-  const key=`${state.root}-${state.chordType}`;
-  if(state.variation==="open" && OPEN_SHAPES[key]) return OPEN_SHAPES[key].slice();
-  const rootPc=NOTE_TO_PC[state.root];
-  const quality=state.chordType;
-  let useA=state.variation==="high";
+  if(instrument.courses!==6 || state.tuning.length!==6 || !state.tuningName.startsWith("Standard")) return chordToneShape(root,type);
+  const key=`${root}-${type}`;
+  if(variation==="open" && OPEN_SHAPES[key]) return OPEN_SHAPES[key].slice();
+  const rootPc=NOTE_TO_PC[root];
+  const quality=type;
+  let useA=variation==="high";
   let rootFret=findRootFret(useA?9:4,rootPc,useA?2:1);
   if(rootFret>12){useA=!useA;rootFret=findRootFret(useA?9:4,rootPc,1);}
   if(!useA){
@@ -257,8 +269,10 @@ function buildShape() {
   return (patterns[quality]||patterns.major).map(v=>v===null?null:v+rootFret);
 }
 
-function chordToneShape(){
-  const pcs=CHORDS[state.chordType].intervals.map(i=>(NOTE_TO_PC[state.root]+i)%12);
+function buildShape(){return buildShapeFor(state.root,state.chordType,state.variation);}
+
+function chordToneShape(root=state.root,type=state.chordType){
+  const pcs=CHORDS[type].intervals.map(i=>(NOTE_TO_PC[root]+i)%12);
   return state.tuning.map(midi=>{
     for(let f=0;f<=12;f++) if(pcs.includes((midi+f+state.capo)%12)) return f;
     return null;
@@ -491,14 +505,15 @@ function playString(s,fret=null,delay=0){
   pluckMidi(state.tuning[s]+state.capo+chosen,s,delay);
 }
 
-async function strum(direction="down"){
-  const order=state.tuning.map((_,i)=>i).filter(i=>state.shape[i]!==null);
+async function strum(direction="down",showLoading=true){
+  const tuning=state.tuning.slice(),shape=state.shape.slice(),capo=state.capo;
+  const order=tuning.map((_,i)=>i).filter(i=>shape[i]!==null);
   if(direction==="up") order.reverse();
   const button=$("playChord"),old=button.innerHTML;
-  button.disabled=true;button.textContent="Loading instrument…";
-  try{await Promise.all(order.map(s=>getSampleBuffer(state.tuning[s]+state.capo+state.shape[s])));}catch(_){}
-  button.disabled=false;button.innerHTML=old;
-  order.forEach((s,i)=>playString(s,null,i*.055));
+  if(showLoading){button.disabled=true;button.textContent="Loading instrument…";}
+  try{await Promise.all(order.map(s=>getSampleBuffer(tuning[s]+capo+shape[s])));}catch(_){}
+  if(showLoading){button.disabled=false;button.innerHTML=old;}
+  order.forEach((s,i)=>pluckMidi(tuning[s]+capo+shape[s],s,i*.055));
 }
 
 let lastStrummed=null;
@@ -509,6 +524,75 @@ function pointerString(e){
   const display=Math.max(0,Math.min(count-1,Math.floor((e.clientY-rect.top)/rect.height*count)));
   const s=count-1-display;
   if(s!==lastStrummed){playString(s);lastStrummed=s;}
+}
+
+function getProgression(){
+  const pattern=PROGRESSIONS[els.progressionStyle.value],keyPc=NOTE_TO_PC[els.progressionKey.value];
+  return pattern.degrees.map((degree,index)=>{
+    const root=NOTE_NAMES[(keyPc+degree)%12],type=pattern.types[index];
+    return{root,type,numeral:pattern.numerals[index],symbol:root+CHORDS[type].suffix,shape:buildShapeFor(root,type)};
+  });
+}
+
+function progressionToTab(chords){
+  const cell=(value)=>`--${String(value).padEnd(2,"-")}---`;
+  const heading="   "+chords.map(chord=>chord.symbol.padStart(Math.floor((7+chord.symbol.length)/2)," ").padEnd(7," ")).join("");
+  const lines=[];
+  for(let display=0;display<state.tuning.length;display++){
+    const stringIndex=state.tuning.length-1-display;
+    const label=SHARP_NAMES[state.tuning[stringIndex]%12].replace("♯","#").padStart(2," ");
+    lines.push(`${label}|${chords.map(chord=>cell(chord.shape[stringIndex]??"x")).join("")}|`);
+  }
+  return heading+"\n"+lines.join("\n");
+}
+
+function loadProgressionTab(){
+  stopTab();
+  if(!state.progression.length)state.progression=getProgression();
+  els.tabInput.value=progressionToTab(state.progression);
+  els.tempo.value=els.progressionTempo.value;els.tempoValue.textContent=els.tempo.value;
+  els.tabStatus.textContent=`Progression loaded · ${state.progression.map(chord=>chord.symbol).join(" – ")}`;
+}
+
+function renderProgression(writeTab=false){
+  stopProgression();
+  state.progression=getProgression();
+  els.progressionChords.innerHTML=state.progression.map((chord,index)=>`<button class="progression-chord" data-index="${index}" aria-label="Show ${chord.symbol} chord"><span class="degree">${chord.numeral}</span><strong>${chord.symbol}</strong></button>`).join("");
+  if(writeTab)loadProgressionTab();
+}
+
+function showProgressionChord(index){
+  const chord=state.progression[index];if(!chord)return;
+  state.progressionIndex=index;state.root=chord.root;state.chordType=chord.type;
+  els.root.value=chord.root;els.chordType.value=chord.type;updateChord();
+  els.progressionChords.querySelectorAll(".progression-chord").forEach((button,i)=>button.classList.toggle("active",i===index));
+}
+
+function stopProgression(){
+  if(state.progressionTimer)clearTimeout(state.progressionTimer);
+  state.progressionTimer=null;state.progressionIndex=-1;state.progressionLoadId++;
+  const button=$("playProgression");
+  if(button){button.disabled=false;button.innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8 5 11 7-11 7V5Z"/></svg> Play progression';}
+}
+
+async function playProgression(){
+  if(state.progressionTimer){stopProgression();showToast("Progression stopped");return;}
+  let index=0;const loadId=state.progressionLoadId;
+  const button=$("playProgression");button.disabled=true;button.textContent="Loading instrument…";
+  const notes=state.progression.flatMap(chord=>chord.shape.map((fret,string)=>fret===null?null:state.tuning[string]+state.capo+fret)).filter(Number.isFinite);
+  try{await Promise.all([...new Set(notes)].map(midi=>getSampleBuffer(midi)));}catch(_){}
+  if(loadId!==state.progressionLoadId)return;
+  button.disabled=false;button.textContent="Stop progression";
+  const step=()=>{
+    if(index>=state.progression.length){
+      if($("progressionLoop").checked)index=0;
+      else{stopProgression();showToast("Progression finished");return;}
+    }
+    showProgressionChord(index);strum("down",false);index++;
+    const interval=60000/Number(els.progressionTempo.value)*Number(els.progressionBeats.value);
+    state.progressionTimer=setTimeout(step,interval);
+  };
+  step();
 }
 
 function loadDemoTab(){
@@ -609,11 +693,12 @@ function setMode(name){
   document.querySelectorAll(".mode-tab").forEach(b=>{const active=b.dataset.panel===name;b.classList.toggle("active",active);b.setAttribute("aria-selected",String(active));});
   document.querySelectorAll(".panel").forEach(p=>p.classList.remove("active"));$(name+"Panel").classList.add("active");
   if(name!=="tabs")stopTab();
+  if(name!=="progressions")stopProgression();
 }
 
 function bindEvents(){
-  els.instrument.addEventListener("change",()=>{state.instrument=els.instrument.value;renderTunings();renderFretboard();updateChord();loadDemoTab();primeInstrument();});
-  els.tuning.addEventListener("change",()=>{state.tuningName=els.tuning.value;state.tuning=INSTRUMENTS[state.instrument].tunings[state.tuningName];renderFretboard();updateChord();});
+  els.instrument.addEventListener("change",()=>{state.instrument=els.instrument.value;renderTunings();renderFretboard();updateChord();renderProgression(true);primeInstrument();});
+  els.tuning.addEventListener("change",()=>{state.tuningName=els.tuning.value;state.tuning=INSTRUMENTS[state.instrument].tunings[state.tuningName];renderFretboard();updateChord();renderProgression(true);});
   els.capo.addEventListener("input",()=>{state.capo=Number(els.capo.value);els.capoValue.textContent=state.capo?`Fret ${state.capo}`:"Off";updateChord();});
   els.lefty.addEventListener("change",()=>{state.lefty=els.lefty.checked;renderFretboard();paintChord();});
   els.root.addEventListener("change",()=>{state.root=els.root.value;updateChord();});
@@ -634,7 +719,12 @@ function bindEvents(){
   els.audioToggle.addEventListener("click",()=>{state.muted=!state.muted;els.audioToggle.classList.toggle("muted",state.muted);showToast(state.muted?"Audio muted":"Audio on");});
   $("helpButton").addEventListener("click",()=>$("helpDialog").showModal());$("closeHelp").addEventListener("click",()=>$("helpDialog").close());
   $("helpDialog").addEventListener("click",e=>{if(e.target===$("helpDialog"))$("helpDialog").close();});
-  $("loadDemo").addEventListener("click",loadDemoTab);$("playTab").addEventListener("click",playTab);
+  els.progressionKey.addEventListener("change",()=>renderProgression(true));
+  els.progressionStyle.addEventListener("change",()=>renderProgression(true));
+  els.progressionTempo.addEventListener("input",()=>{els.progressionTempoValue.textContent=els.progressionTempo.value;els.tempo.value=els.progressionTempo.value;els.tempoValue.textContent=els.tempo.value;});
+  els.progressionChords.addEventListener("click",e=>{const button=e.target.closest("[data-index]");if(button){stopProgression();showProgressionChord(Number(button.dataset.index));}});
+  $("playProgression").addEventListener("click",playProgression);
+  $("loadDemo").addEventListener("click",loadDemoTab);$("loadProgressionTab").addEventListener("click",loadProgressionTab);$("playTab").addEventListener("click",playTab);
   els.tempo.addEventListener("input",()=>els.tempoValue.textContent=els.tempo.value);
   els.startTuner.addEventListener("click",startTuner);
   els.tuningStrings.addEventListener("click",e=>{const b=e.target.closest("[data-string]");if(b)pluckMidi(state.tuning[Number(b.dataset.string)],Number(b.dataset.string));});
