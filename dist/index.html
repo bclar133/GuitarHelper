@@ -146,26 +146,6 @@
 
       <div class="progression-panel panel" id="progressionsPanel">
         <div class="progression-controls">
-          <label class="field compact">
-            <span>Key</span>
-            <select id="progressionKey">
-              <option>C</option><option>C♯</option><option>D</option><option>E♭</option>
-              <option>E</option><option>F</option><option>F♯</option><option>G</option>
-              <option>A♭</option><option>A</option><option>B♭</option><option>B</option>
-            </select>
-          </label>
-          <label class="field progression-style-field">
-            <span>Progression</span>
-            <select id="progressionStyle">
-              <option value="pop">Pop · I–V–vi–IV</option>
-              <option value="classic">Classic · I–IV–V–I</option>
-              <option value="fifties">50s · I–vi–IV–V</option>
-              <option value="sad">Emotional · vi–IV–I–V</option>
-              <option value="blues">Blues turnaround · I7–IV7–I7–V7</option>
-              <option value="rock">Rock · I5–♭VII5–IV5–I5</option>
-              <option value="custom">Custom chords</option>
-            </select>
-          </label>
           <label class="tempo-field progression-tempo">Tempo <input type="range" min="50" max="180" value="90" id="progressionTempo"><b id="progressionTempoValue">90</b></label>
           <label class="field beats-field">
             <span>Beats per chord</span>
@@ -177,13 +157,21 @@
             Play progression
           </button>
         </div>
-        <div class="custom-progression-entry" id="customProgressionEntry">
+        <div class="custom-progression-entry">
           <label class="field">
-            <span>Your chords</span>
+            <span>Type your progression</span>
             <input type="text" id="customProgressionInput" value="C, G, Am, F" placeholder="C, G, Am, F" autocomplete="off">
           </label>
           <button class="secondary-button" id="applyCustomProgression">Use these chords</button>
-          <span>Enter 2–8 chord symbols separated by commas or spaces, such as C, G, Am, F.</span>
+          <div class="progression-library-add">
+            <label class="field">
+              <span>Or choose a chord</span>
+              <select id="progressionChordPicker" aria-label="Choose a chord to add"></select>
+            </label>
+            <button class="secondary-button" id="addProgressionChord">Add chord</button>
+            <button class="text-button" id="clearProgressionChords">Clear</button>
+          </div>
+          <span>Enter 2–8 chord symbols separated by commas or spaces, or add them from the chord list.</span>
         </div>
         <div class="progression-chords" id="progressionChords" aria-label="Chords in progression"></div>
       </div>
