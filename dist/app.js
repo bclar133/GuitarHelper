@@ -146,6 +146,7 @@ const state = {
   root:"C", chordType:"major", variation:"open", capo:0, lefty:false,
   labelMode:"fingers", muted:false, shape:[], fingers:[], audio:null, audioBus:null,
   tabTimer:null, progressionTimer:null, progressionIndex:-1, progression:[], progressionLoadId:0,
+  customChordText:"C, G, Am, F",
   tunerStream:null, tunerFrame:null, tabActive:null
 };
 const chordSearchMap = new Map();
@@ -160,6 +161,7 @@ const els = {
   tempo:$("tempoSlider"), tempoValue:$("tempoValue"), tunerNote:$("tunerNote"), tunerFrequency:$("tunerFrequency"),
   progressionKey:$("progressionKey"), progressionStyle:$("progressionStyle"), progressionTempo:$("progressionTempo"),
   progressionTempoValue:$("progressionTempoValue"), progressionBeats:$("progressionBeats"), progressionChords:$("progressionChords"),
+  customProgressionEntry:$("customProgressionEntry"), customProgressionInput:$("customProgressionInput"),
   tunerTarget:$("tunerTarget"), tunerNeedle:$("tunerNeedle"), meterLabel:$("meterLabel"), tuningStrings:$("tuningStrings"),
   referencePitch:$("referencePitch"), startTuner:$("startTuner")
 };
@@ -526,7 +528,46 @@ function pointerString(e){
   if(s!==lastStrummed){playString(s);lastStrummed=s;}
 }
 
+function parseChordSymbol(value){
+  const token=value.trim().replaceAll("♯","#").replaceAll("♭","b");
+  const match=token.match(/^([A-Ga-g])([#b]?)(.*)$/);
+  if(!match)throw new Error(`“${value}” is not a recognised chord`);
+  const rawRoot=match[1].toUpperCase()+match[2];
+  const rootAliases={"C#":"C♯",Db:"C♯","D#":"E♭",Eb:"E♭","E#":"F",Fb:"E","F#":"F♯",Gb:"F♯","G#":"A♭",Ab:"A♭","A#":"B♭",Bb:"B♭","B#":"C",Cb:"B"};
+  const root=rootAliases[rawRoot]||rawRoot;
+  if(!(root in NOTE_TO_PC))throw new Error(`“${value}” has an unsupported root note`);
+  const suffix=match[3].trim().toLowerCase();
+  const types={"":"major",maj:"major",major:"major",m:"minor",min:"minor",minor:"minor","7":"7",dom7:"7",maj7:"maj7",major7:"maj7",m7:"min7",min7:"min7",minor7:"min7",sus2:"sus2",sus4:"sus4",dim:"dim","°":"dim",aug:"aug","+":"aug","6":"6",m6:"min6",min6:"min6","9":"9",add9:"add9","5":"5"};
+  const type=types[suffix];
+  if(!type)throw new Error(`“${value}” uses a chord type that is not available`);
+  return{root,type,symbol:root+CHORDS[type].suffix};
+}
+
+function parseCustomProgression(text){
+  const values=(text.includes(",")?text.split(","):text.split(/\s+/)).map(value=>value.trim()).filter(Boolean);
+  if(values.length<2||values.length>8)throw new Error("Enter between 2 and 8 chords");
+  return values.map(parseChordSymbol);
+}
+
+function updateCustomProgressionVisibility(){
+  const custom=els.progressionStyle.value==="custom";
+  els.customProgressionEntry.classList.toggle("visible",custom);
+  els.progressionKey.disabled=custom;
+}
+
+function applyCustomProgression(){
+  try{
+    parseCustomProgression(els.customProgressionInput.value);
+    state.customChordText=els.customProgressionInput.value;
+    els.progressionStyle.value="custom";renderProgression(true);
+    showToast("Custom progression ready");
+  }catch(error){showToast(error.message);}
+}
+
 function getProgression(){
+  if(els.progressionStyle.value==="custom"){
+    return parseCustomProgression(state.customChordText).map((chord,index)=>({...chord,numeral:String(index+1),shape:buildShapeFor(chord.root,chord.type)}));
+  }
   const pattern=PROGRESSIONS[els.progressionStyle.value],keyPc=NOTE_TO_PC[els.progressionKey.value];
   return pattern.degrees.map((degree,index)=>{
     const root=NOTE_NAMES[(keyPc+degree)%12],type=pattern.types[index];
@@ -556,6 +597,7 @@ function loadProgressionTab(){
 
 function renderProgression(writeTab=false){
   stopProgression();
+  updateCustomProgressionVisibility();
   state.progression=getProgression();
   els.progressionChords.innerHTML=state.progression.map((chord,index)=>`<button class="progression-chord" data-index="${index}" aria-label="Show ${chord.symbol} chord"><span class="degree">${chord.numeral}</span><strong>${chord.symbol}</strong></button>`).join("");
   if(writeTab)loadProgressionTab();
@@ -721,6 +763,8 @@ function bindEvents(){
   $("helpDialog").addEventListener("click",e=>{if(e.target===$("helpDialog"))$("helpDialog").close();});
   els.progressionKey.addEventListener("change",()=>renderProgression(true));
   els.progressionStyle.addEventListener("change",()=>renderProgression(true));
+  $("applyCustomProgression").addEventListener("click",applyCustomProgression);
+  els.customProgressionInput.addEventListener("keydown",event=>{if(event.key==="Enter"){event.preventDefault();applyCustomProgression();}});
   els.progressionTempo.addEventListener("input",()=>{els.progressionTempoValue.textContent=els.progressionTempo.value;els.tempo.value=els.progressionTempo.value;els.tempoValue.textContent=els.tempo.value;});
   els.progressionChords.addEventListener("click",e=>{const button=e.target.closest("[data-index]");if(button){stopProgression();showProgressionChord(Number(button.dataset.index));}});
   $("playProgression").addEventListener("click",playProgression);
