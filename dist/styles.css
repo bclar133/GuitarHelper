@@ -159,15 +159,16 @@ input[type="range"] { accent-color: var(--amber); width: 100%; }
 .progression-panel { display:none; flex-direction:column; gap:11px; }
 .progression-panel.active { display:flex; }
 .progression-controls { display:flex; align-items:end; gap:10px; flex-wrap:wrap; }
-.progression-style-field { min-width:230px; }
 .progression-tempo { min-height:42px; }
 .beats-field { min-width:112px; }
 .loop-field { min-height:42px; display:flex; align-items:center; gap:7px; color:var(--muted); font-size:.82rem; white-space:nowrap; }
 .loop-field input { accent-color:var(--amber); }
-.custom-progression-entry { display:none; grid-template-columns:minmax(220px,1fr) auto; align-items:end; gap:8px; padding:10px; border:1px solid #3d3933; border-radius:12px; background:#1d1c19; }
-.custom-progression-entry.visible { display:grid; }
+.custom-progression-entry { display:grid; grid-template-columns:minmax(220px,1fr) auto; align-items:end; gap:8px; padding:10px; border:1px solid #3d3933; border-radius:12px; background:#1d1c19; }
 .custom-progression-entry input { width:100%; border:1px solid #45413b; border-radius:10px; color:var(--ink); background:#25231f; padding:10px 11px; outline:none; }
 .custom-progression-entry > span { grid-column:1/-1; color:var(--muted); font-size:.73rem; }
+.progression-library-add { grid-column:1/-1; display:grid; grid-template-columns:minmax(220px,1fr) auto auto; align-items:end; gap:8px; }
+.text-button { min-height:42px; padding:8px 10px; border:0; color:var(--muted); background:transparent; font-weight:600; }
+.text-button:hover { color:var(--ink); }
 .progression-chords { display:flex; gap:8px; overflow-x:auto; padding-bottom:2px; }
 .progression-chord {
   min-width:92px; min-height:54px; flex:1 0 92px; display:flex; align-items:center; justify-content:center; gap:10px;
@@ -337,7 +338,6 @@ dialog strong { color:var(--ink); }
   .current-chord { grid-column:1/-1; min-width:0; justify-content:flex-start; padding:4px 2px 0; }
   .chord-symbol { font-size:3rem; }
   .progression-controls { display:grid; grid-template-columns:.7fr 1.3fr; align-items:end; gap:8px; }
-  .progression-style-field { min-width:0; }
   .progression-tempo { grid-column:1/-1; }
   .progression-tempo input { flex:1; }
   .beats-field { min-width:0; }
@@ -345,6 +345,8 @@ dialog strong { color:var(--ink); }
   .progression-controls .primary-button { grid-column:1/-1; }
   .custom-progression-entry { grid-template-columns:1fr; }
   .custom-progression-entry > span { grid-column:1; }
+  .progression-library-add { grid-column:1; grid-template-columns:1fr auto; }
+  .progression-library-add .text-button { grid-column:1/-1; min-height:28px; padding:2px; }
   .progression-chords { gap:5px; }
   .progression-chord { min-width:72px; flex-basis:72px; min-height:46px; gap:5px; padding:5px; }
   .progression-chord strong { font-size:1.2rem; }
